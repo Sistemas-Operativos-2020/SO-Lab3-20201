@@ -17,19 +17,43 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <pthread.h>
+
+//  {}  \n  []    ||
+
+// Variables to obtain command line parameters
+unsigned int seed = 1;
+int p = 10000000;
+int n_threads = 2;
+int max_iters = 1000;	
+// Variables to perform SAXPY operation
+double* X;
+double a;
+double* Y;
+double* Y_avgs;
+int i, it;
+
+struct rangos{
+	int inicio;
+	int cant;
+};
+
+void* do_saxpy(void* args){
+	struct rangos *p = (struct rangos *) args;
+	//SAXPY iterative SAXPY mfunction
+	double *Y_sum = (double*) malloc(sizeof(double) * max_iters);
+	int i;
+	int fin = p -> inicio + p -> cant;
+	for(int iter = 0; iter < max_iters; iter++){
+		for(i = p -> inicio; i < fin; i++){
+			Y[i] = Y[i] + a * X[i];
+			Y_sum[iter] += Y[i];
+		}
+	}
+	return Y_sum;
+}
 
 int main(int argc, char* argv[]){
-	// Variables to obtain command line parameters
-	unsigned int seed = 1;
-  	int p = 10000000;
-  	int n_threads = 2;
-  	int max_iters = 1000;
-  	// Variables to perform SAXPY operation
-	double* X;
-	double a;
-	double* Y;
-	double* Y_avgs;
-	int i, it;
 	// Variables to get execution time
 	struct timeval t_start, t_end;
 	double exec_time;
@@ -98,18 +122,33 @@ int main(int argc, char* argv[]){
 	printf("a= %f \n", a);	
 #endif
 
-	/*
-	 *	Function to parallelize 
-	 */
-	gettimeofday(&t_start, NULL);
-	//SAXPY iterative SAXPY mfunction
-	for(it = 0; it < max_iters; it++){
-		for(i = 0; i < p; i++){
-			Y[i] = Y[i] + a * X[i];
-			Y_avgs[it] += Y[i];
-		}
-		Y_avgs[it] = Y_avgs[it] / p;
+	pthread_t hilos[n_threads];
+	struct rangos args[n_threads];
+	int cant_por_hilo = p / n_threads;
+	double* results[n_threads];
+
+	for(int t = 0 ; t < n_threads ; t++){
+		args[t].inicio = cant_por_hilo * t;
+		args[t].cant = cant_por_hilo;
 	}
+
+	gettimeofday(&t_start, NULL);
+
+	for(int t = 0 ; t < n_threads ; t++){
+		pthread_create(&hilos[t], NULL, &do_saxpy, &args[t]);
+	}
+
+	for(int t = 0 ; t < n_threads ; t++){
+		pthread_join(hilos[t], (void*) &results[t]);
+	}
+
+	for(i = 0 ; i < max_iters ; i++){
+		for(int t = 0 ; t < n_threads ; t++){
+			Y_avgs[i] += results[t][i];
+		}
+		Y_avgs[i] = Y_avgs[i] / p;
+	}
+
 	gettimeofday(&t_end, NULL);
 
 #ifdef DEBUG
