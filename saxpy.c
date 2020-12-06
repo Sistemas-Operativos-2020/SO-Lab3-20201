@@ -125,11 +125,18 @@ int main(int argc, char* argv[]){
 	pthread_t hilos[n_threads];
 	struct rangos args[n_threads];
 	int cant_por_hilo = p / n_threads;
+	int overflow = p % n_threads;
+	int finAnt = 0;
 	double* results[n_threads];
 
 	for(int t = 0 ; t < n_threads ; t++){
-		args[t].inicio = cant_por_hilo * t;
-		args[t].cant = cant_por_hilo;
+		if(t < overflow)
+			args[t].cant = cant_por_hilo + 1;
+		else
+			args[t].cant = cant_por_hilo;
+		
+		args[t].inicio = finAnt;
+		finAnt += args[t].cant;
 	}
 
 	gettimeofday(&t_start, NULL);
